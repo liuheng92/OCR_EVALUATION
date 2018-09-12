@@ -3,6 +3,7 @@
 from collections import namedtuple
 import rrc_evaluation_funcs
 import importlib
+import argparse
 
 def evaluation_imports():
     """
@@ -114,8 +115,8 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                     return 0.
 			
     def center(r):
-        x = float(r.xmin) + float(r.xmax - r.xmin + 1) / 2.;
-        y = float(r.ymin) + float(r.ymax - r.ymin + 1) / 2.;
+        x = float(r.xmin) + float(r.xmax - r.xmin + 1) / 2.
+        y = float(r.ymin) + float(r.ymax - r.ymin + 1) / 2.
         return Point(x,y)
         
     def point_distance(r1, r2):
@@ -142,8 +143,8 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
     gt = rrc_evaluation_funcs.load_zip_file(gtFilePath,evaluationParams['GT_SAMPLE_NAME_2_ID'])
     subm = rrc_evaluation_funcs.load_zip_file(submFilePath,evaluationParams['DET_SAMPLE_NAME_2_ID'],True)
    
-    numGt = 0;
-    numDet = 0;
+    numGt = 0
+    numDet = 0
    
     for resFile in gt:
         
@@ -170,6 +171,17 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
             points = pointsList[n]
             transcription = transcriptionsList[n]
             dontCare = transcription == "###"
+
+            #convert x1,y1,x2,y2,x3,y3,x4,y4 to xmin,ymin,xmax,ymax
+            if len(points)==8:
+                points_tmp = np.array(points).reshape(4, 2)
+                points_x = points_tmp[:, 0]
+                points_y = points_tmp[:, 1]
+                xmin = points_x[np.argmin(points_x)]
+                xmax = points_x[np.argmax(points_x)]
+                ymin = points_y[np.argmin(points_x)]
+                ymax = points_y[np.argmax(points_y)]
+                points = [xmin, ymin, xmax, ymax]
             gtRect = Rectangle(*points)
             gtRects.append(gtRect)
             gtPolPoints.append(points)
@@ -183,7 +195,7 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
             pointsList,_,_ = rrc_evaluation_funcs.get_tl_line_values_from_file_contents(detFile,evaluationParams['CRLF'],True,True,False)
             for n in range(len(pointsList)):
                 points = pointsList[n]
-                print points
+                # print points
                 detRect = Rectangle(*points)
                 detRects.append(detRect)
                 detPolPoints.append(points)
@@ -191,7 +203,7 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                     for dontCareRectNum in gtDontCareRectsNum:
                         dontCareRect = gtRects[dontCareRectNum]
                         intersected_area = area(dontCareRect,detRect)
-                        rdDimensions = ( (detRect.xmax - detRect.xmin+1) * (detRect.ymax - detRect.ymin+1));
+                        rdDimensions = ( (detRect.xmax - detRect.xmin+1) * (detRect.ymax - detRect.ymin+1))
                         if (rdDimensions==0) :
                             precision = 0
                         else:
@@ -218,8 +230,8 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                         rG = gtRects[gtNum]
                         rD = detRects[detNum]
                         intersected_area = area(rG,rD)
-                        rgDimensions = ( (rG.xmax - rG.xmin+1) * (rG.ymax - rG.ymin+1) );
-                        rdDimensions = ( (rD.xmax - rD.xmin+1) * (rD.ymax - rD.ymin+1));
+                        rgDimensions = ( (rG.xmax - rG.xmin+1) * (rG.ymax - rG.ymin+1) )
+                        rdDimensions = ( (rD.xmax - rD.xmin+1) * (rD.ymax - rD.ymin+1))
                         recallMat[gtNum,detNum] = 0 if rgDimensions==0 else  intersected_area / rgDimensions
                         precisionMat[gtNum,detNum] = 0 if rdDimensions==0 else intersected_area / rdDimensions
 
@@ -232,9 +244,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                             if match is True :
                                 rG = gtRects[gtNum]
                                 rD = detRects[detNum]
-                                normDist = center_distance(rG, rD);
-                                normDist /= diag(rG) + diag(rD);
-                                normDist *= 2.0;
+                                normDist = center_distance(rG, rD)
+                                normDist /= diag(rG) + diag(rD)
+                                normDist *= 2.0
                                 if normDist < evaluationParams['EV_PARAM_IND_CENTER_DIFF_THR'] :
                                     gtRectMat[gtNum] = 1
                                     detRectMat[detNum] = 1
@@ -313,10 +325,17 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
     resDict = {'calculated':True,'Message':'','method': methodMetrics,'per_sample': perSampleMetrics}
     
     
-    return resDict;
+    return resDict
 
-
+def argparser():
+    parse = argparse.ArgumentParser()
+    parse.add_argument('-g', dest='g', default='./gt.zip', help="Path of the Ground Truth file. In most cases, the Ground Truth will be included in the same Zip file named 'gt.zip', gt.txt' or 'gt.json'. If not, you will be able to get it on the Downloads page of the Task.")
+    parse.add_argument('-s', dest='s', default='./submit.zip', help="Path of your method's results file.")
+    parse.add_argument('-o', dest='o', help="Path to a directory where to copy the file ‘results.zip’ that contains per-sample results.")
+    parse.add_argument('-p', dest='p', help="JSON string parameters to override the script default parameters. The parameters that can be overrided are inside the function 'default_evaluation_params' located at the begining of the evaluation Script. use: -p  '{\"CRLF\":true}'")
+    args = parse.parse_args()
+    return args
 
 if __name__=='__main__':
-        
-    rrc_evaluation_funcs.main_evaluation(None,default_evaluation_params,validate_data,evaluate_method)
+    args = argparser()
+    rrc_evaluation_funcs.main_evaluation(args,default_evaluation_params,validate_data,evaluate_method)

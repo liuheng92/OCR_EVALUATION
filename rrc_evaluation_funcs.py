@@ -10,11 +10,6 @@ import codecs
 import importlib
 from StringIO import StringIO
 
-def print_help():
-    sys.stdout.write('Usage: python %s.py -g=<gtFile> -s=<submFile> [-o=<outputFolder> -p=<jsonParams>]' %sys.argv[0])
-    sys.exit(2)
-    
-
 def load_zip_file_keys(file,fileNameRegExp=''):
     """
     Returns an array with the entries of the ZIP file that match with the regular expression.
@@ -129,14 +124,14 @@ def get_tl_line_values(line,LTRB=True,withTranscription=False,withConfidence=Fal
     Returns values from a textline. Points , [Confidences], [Transcriptions]
     """
     confidence = 0.0
-    transcription = "";
+    transcription = ""
     points = []
     
-    numPoints = 4;
+    numPoints = 4
     
     if LTRB:
     
-        numPoints = 4;
+        numPoints = 4
         
         if withTranscription and withConfidence:
             m = re.match(r'^\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-1].?[0-9]*)\s*,(.*)$',line)
@@ -168,12 +163,12 @@ def get_tl_line_values(line,LTRB=True,withTranscription=False,withConfidence=Fal
         points = [ float(m.group(i)) for i in range(1, (numPoints+1) ) ]
         
         if (imWidth>0 and imHeight>0):
-            validate_point_inside_bounds(xmin,ymin,imWidth,imHeight);
-            validate_point_inside_bounds(xmax,ymax,imWidth,imHeight);
+            validate_point_inside_bounds(xmin,ymin,imWidth,imHeight)
+            validate_point_inside_bounds(xmax,ymax,imWidth,imHeight)
 
     else:
         
-        numPoints = 8;
+        numPoints = 8
         
         if withTranscription and withConfidence:
             m = re.match(r'^\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*([0-1].?[0-9]*)\s*,(.*)$',line)
@@ -191,17 +186,17 @@ def get_tl_line_values(line,LTRB=True,withTranscription=False,withConfidence=Fal
             m = re.match(r'^\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*,\s*(-?[0-9]+)\s*$',line)
             if m == None :
                 raise Exception("Format incorrect. Should be: x1,y1,x2,y2,x3,y3,x4,y4")
-            
+
         points = [ float(m.group(i)) for i in range(1, (numPoints+1) ) ]
 
         validate_clockwise_points(points)
-        
+
         if (imWidth>0 and imHeight>0):
-            validate_point_inside_bounds(points[0],points[1],imWidth,imHeight);
-            validate_point_inside_bounds(points[2],points[3],imWidth,imHeight);
-            validate_point_inside_bounds(points[4],points[5],imWidth,imHeight);
-            validate_point_inside_bounds(points[6],points[7],imWidth,imHeight);
-            
+            validate_point_inside_bounds(points[0],points[1],imWidth,imHeight)
+            validate_point_inside_bounds(points[2],points[3],imWidth,imHeight)
+            validate_point_inside_bounds(points[4],points[5],imWidth,imHeight)
+            validate_point_inside_bounds(points[6],points[7],imWidth,imHeight)
+
     
     if withConfidence:
         try:
@@ -246,7 +241,7 @@ def validate_clockwise_points(points):
                 ( point[0][0] - point[3][0])*( point[0][1] + point[3][1])
     ]
     
-    summatory = edge[0] + edge[1] + edge[2] + edge[3];
+    summatory = edge[0] + edge[1] + edge[2] + edge[3]
     if summatory>0:
         raise Exception("Points are not clockwise. The coordinates of bounding quadrilaterals have to be given in clockwise order. Regarding the correct interpretation of 'clockwise' remember that the image coordinate system used is the standard one, with the image origin at the upper left, the X axis extending to the right and Y axis extending downwards.")
 
@@ -264,7 +259,7 @@ def get_tl_line_values_from_file_contents(content,CRLF=True,LTRB=True,withTransc
     for line in lines:
         line = line.replace("\r","").replace("\n","")
         if(line != "") :
-            points, confidence, transcription = get_tl_line_values(line,LTRB,withTranscription,withConfidence,imWidth,imHeight);
+            points, confidence, transcription = get_tl_line_values(line,LTRB,withTranscription,withConfidence,imWidth,imHeight)
             pointsList.append(points)
             transcriptionsList.append(transcription)
             confidencesList.append(confidence)
@@ -278,40 +273,37 @@ def get_tl_line_values_from_file_contents(content,CRLF=True,LTRB=True,withTransc
         
     return pointsList,confidencesList,transcriptionsList
 
-def main_evaluation(p,default_evaluation_params_fn,validate_data_fn,evaluate_method_fn,show_result=True,per_sample=True):
+def main_evaluation(args,default_evaluation_params_fn,validate_data_fn,evaluate_method_fn,show_result=True,per_sample=True):
     """
     This process validates a method, evaluates it and if it succed generates a ZIP file with a JSON entry for each sample.
     Params:
-    p: Dictionary of parmeters with the GT/submission locations. If None is passed, the parameters send by the system are used.
-    default_evaluation_params_fn: points to a function that returns a dictionary with the default parameters used for the evaluation
-    validate_data_fn: points to a method that validates the corrct format of the submission
+    args:
+    -g for ground truth,
+    -s for detect result,
+    -p The parameters that can be overrided are inside the function 'default_evaluation_params' located at the begining of the evaluation Script,
+    -o Path to a directory where to copy the file ‘results.zip’ that contains per-sample results,
     evaluate_method_fn: points to a function that evaluated the submission and return a Dictionary with the results
     """
-
-    if (p == None):
-        p = dict([s[1:].split('=') for s in sys.argv[1:]])
-        if(len(sys.argv)<3):
-            print_help()
-
     evalParams = default_evaluation_params_fn()
-    if 'p' in p.keys():
-        evalParams.update( p['p'] if isinstance(p['p'], dict) else json.loads(p['p'][1:-1]) )
+    if args.p:
+        evalParams.update(json.loads(args.p[1:-1]))
+    print evalParams
 
     resDict={'calculated':True,'Message':'','method':'{}','per_sample':'{}'}    
     try:
-        validate_data_fn(p['g'], p['s'], evalParams)  
-        evalData = evaluate_method_fn(p['g'], p['s'], evalParams)
+        validate_data_fn(args.g, args.s, evalParams)
+        evalData = evaluate_method_fn(args.g, args.s, evalParams)
         resDict.update(evalData)
         
     except Exception, e:
         resDict['Message']= str(e)
         resDict['calculated']=False
 
-    if 'o' in p:
-        if not os.path.exists(p['o']):
-            os.makedirs(p['o'])
+    if args.o:
+        if not os.path.exists(args.o):
+            os.makedirs(args.o)
 
-        resultsOutputname = p['o'] + '/results.zip'
+        resultsOutputname = args.o + '/results.zip'
         outZip = zipfile.ZipFile(resultsOutputname, mode='w', allowZip64=True)
 
         del resDict['per_sample']
@@ -323,11 +315,11 @@ def main_evaluation(p,default_evaluation_params_fn,validate_data_fn,evaluate_met
     if not resDict['calculated']:
         if show_result:
             sys.stderr.write('Error!\n'+ resDict['Message']+'\n\n')
-        if 'o' in p:
+        if args.o:
             outZip.close()
         return resDict
     
-    if 'o' in p:
+    if args.o:
         if per_sample == True:
             for k,v in evalData['per_sample'].iteritems():
                 outZip.writestr( k + '.json',json.dumps(v)) 
@@ -345,7 +337,7 @@ def main_evaluation(p,default_evaluation_params_fn,validate_data_fn,evaluate_met
     return resDict
 
 
-def main_validation(default_evaluation_params_fn,validate_data_fn):
+def main_validation(args, default_evaluation_params_fn,validate_data_fn):
     """
     This process validates a method
     Params:
@@ -353,12 +345,11 @@ def main_validation(default_evaluation_params_fn,validate_data_fn):
     validate_data_fn: points to a method that validates the corrct format of the submission
     """    
     try:
-        p = dict([s[1:].split('=') for s in sys.argv[1:]])
         evalParams = default_evaluation_params_fn()
-        if 'p' in p.keys():
-            evalParams.update( p['p'] if isinstance(p['p'], dict) else json.loads(p['p'][1:-1]) )
+        if args.p:
+            evalParams.update(json.loads(args.p[1:-1]))
 
-        validate_data_fn(p['g'], p['s'], evalParams)              
+        validate_data_fn(args.g, args.s, evalParams)
         print 'SUCCESS'
         sys.exit(0)
     except Exception as e:
