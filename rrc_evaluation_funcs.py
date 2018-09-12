@@ -7,8 +7,6 @@ import re
 import sys
 import os
 import codecs
-import importlib
-from StringIO import StringIO
 
 def load_zip_file_keys(file,fileNameRegExp=''):
     """
@@ -216,9 +214,9 @@ def get_tl_line_values(line,LTRB=True,withTranscription=False,withConfidence=Fal
             
 def validate_point_inside_bounds(x,y,imWidth,imHeight):
     if(x<0 or x>imWidth):
-            raise Exception("X value (%s) not valid. Image dimensions: (%s,%s)" %(xmin,imWidth,imHeight))
+            raise Exception("X value (%s) not valid. Image dimensions: (%s,%s)" %(x,imWidth,imHeight))
     if(y<0 or y>imHeight):
-            raise Exception("Y value (%s)  not valid. Image dimensions: (%s,%s) Sample: %s Line:%s" %(ymin,imWidth,imHeight))
+            raise Exception("Y value (%s)  not valid. Image dimensions: (%s,%s) Sample: %s Line:%s" %(y,imWidth,imHeight))
 
 def validate_clockwise_points(points):
     """
@@ -287,7 +285,7 @@ def main_evaluation(args,default_evaluation_params_fn,validate_data_fn,evaluate_
     evalParams = default_evaluation_params_fn()
     if args.p:
         evalParams.update(json.loads(args.p[1:-1]))
-    print evalParams
+    # print evalParams
 
     resDict={'calculated':True,'Message':'','method':'{}','per_sample':'{}'}    
     try:
@@ -342,7 +340,7 @@ def main_validation(args, default_evaluation_params_fn,validate_data_fn):
     This process validates a method
     Params:
     default_evaluation_params_fn: points to a function that returns a dictionary with the default parameters used for the evaluation
-    validate_data_fn: points to a method that validates the corrct format of the submission
+    validate_data_fn: points to a method that validates the correct format of the submission
     """    
     try:
         evalParams = default_evaluation_params_fn()
