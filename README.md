@@ -3,8 +3,8 @@ INSTRUCTIONS FOR THE STANDALONE SCRIPTS
 
 ### HOW TO USE
 Requirements:
--         Python version 2.7.
--         Each Task requires different Python modules. When running the script, if some module is not installed you will see a notification and installation instructions.
+- Python version 2.7.
+- Each Task requires different Python modules. When running the script, if some module is not installed you will see a notification and installation instructions.
  
 Procedure:
 Download the ZIP file for the requested script and unzip it to a directory.
@@ -29,7 +29,7 @@ Optional parameters:
 
 -c: choose algorithm for differet tasks.(Challenges 1、2 use 'DetEva' Challenges 4 use 'IoU', default 'IoU')
  
-**Example: python script.py –g gt.zip –s submit.zip –o ./ -p  '{\"CRLF\":true}' -c 'DetEva'**
+**Example: python script.py –g gt.zip –s submit.zip –o ./ -p  '{\"CRLF\":true}' -c DetEva**
 
 
 ### THEORY
