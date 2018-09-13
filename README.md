@@ -32,5 +32,5 @@ Optional parameters:
 **Example: python script.py –g gt.zip –s submit.zip –o ./ -p  '{\"CRLF\":true}' -c 'DetEva'**
 
 
-### THEROY
+### THEORY
 see [my blog](https://blog.csdn.net/liuxiaoheng1992/article/details/82632594)
