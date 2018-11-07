@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 from collections import namedtuple
 import rrc_evaluation_funcs
+from rrc_evaluation_funcs import logger
 import importlib
+import re
 
 def evaluation_imports():
     """
@@ -23,10 +25,11 @@ def default_evaluation_params():
         'AREA_PRECISION_CONSTRAINT': 0.5,
         'GT_SAMPLE_NAME_2_ID': 'gt_img_([0-9]+).txt',
         'DET_SAMPLE_NAME_2_ID': 'res_img_([0-9]+).txt',
-        'LTRB': True,  # LTRB:2points(left,top,right,bottom) or 4 points(x1,y1,x2,y2,x3,y3,x4,y4)
+        'LTRB': False,  # LTRB:2points(left,top,right,bottom) or 4 points(x1,y1,x2,y2,x3,y3,x4,y4)
         'CRLF': False,  # Lines are delimited by Windows CRLF format
         'CONFIDENCES': False,  # Detections must include confidence value. AP will be calculated
-        'PER_SAMPLE_RESULTS': True  # Generate per sample results and produce data for visualization
+        'PER_SAMPLE_RESULTS': True,  # Generate per sample results and produce data for visualization
+        'E2E': False   #compute average edit distance for end to end evaluation
     }
 
 
@@ -50,7 +53,7 @@ def validate_data(gtFilePath, submFilePath, evaluationParams):
             raise Exception("The sample %s not present in GT" % k)
 
         rrc_evaluation_funcs.validate_lines_in_file(k, subm[k], evaluationParams['CRLF'], evaluationParams['LTRB'],
-                                                    True, evaluationParams['CONFIDENCES'])
+                                                    evaluationParams['E2E'], evaluationParams['CONFIDENCES'])
 
 
 def evaluate_method(gtFilePath, submFilePath, evaluationParams):
@@ -60,6 +63,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
         - method (required)  Global method metrics. Ex: { 'Precision':0.8,'Recall':0.9 }
         - samples (optional) Per sample metrics. Ex: {'sample1' : { 'Precision':0.8,'Recall':0.9 } , 'sample2' : { 'Precision':0.8,'Recall':0.9 }
     """
+    if evaluationParams['E2E']:
+        from hanziconv import HanziConv
+        import editdistance
 
     for module, alias in evaluation_imports().iteritems():
         globals()[alias] = importlib.import_module(module)
@@ -137,6 +143,29 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
 
         return AP
 
+    #from RTWC17
+    def normalize_txt(st):
+        """
+        Normalize Chinese text strings by:
+          - remove puncutations and other symbols
+          - convert traditional Chinese to simplified
+          - convert English characters to lower cases
+        """
+        st = ''.join(st.split(' '))
+        st = re.sub("\"", "", st)
+        # remove any this not one of Chinese character, ascii 0-9, and ascii a-z and A-Z
+        new_st = re.sub(ur'[^\u4e00-\u9fa5\u0041-\u005a\u0061-\u007a0-9]+', '', st)
+        # convert Traditional Chinese to Simplified Chinese
+        new_st = HanziConv.toSimplified(new_st)
+        # convert uppercase English letters to lowercase
+        new_st = new_st.lower()
+        return new_st
+
+    def text_distance(str1, str2):
+        str1 = normalize_txt(str1)
+        str2 = normalize_txt(str2)
+        return editdistance.eval(str1, str2)
+
     perSampleMetrics = {}
 
     matchedSum = 0
@@ -152,6 +181,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
     arrGlobalConfidences = []
     arrGlobalMatches = []
 
+    #total edit distance
+    total_dist = 0
+
     for resFile in gt:
 
         gtFile = rrc_evaluation_funcs.decode_utf8(gt[resFile])
@@ -165,6 +197,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
 
         gtPols = []
         detPols = []
+
+        gtTrans = []
+        detTrans = []
 
         gtPolPoints = []
         detPolPoints = []
@@ -181,13 +216,16 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
         arrSampleMatch = []
         sampleAP = 0
 
+        example_dist = 0
+        match_tuples = []
+
         evaluationLog = ""
 
         pointsList, _, transcriptionsList = rrc_evaluation_funcs.get_tl_line_values_from_file_contents(gtFile,evaluationParams['CRLF'],evaluationParams['LTRB'],True, False)
         for n in range(len(pointsList)):
             points = pointsList[n]
             transcription = transcriptionsList[n]
-            dontCare = transcription == "###"
+            dontCare = (transcription == "###") or (transcription=="?")
             if evaluationParams['LTRB']:
                 gtRect = Rectangle(*points)
                 gtPol = rectangle_to_polygon(gtRect)
@@ -195,6 +233,7 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                 gtPol = polygon_from_points(points)
             gtPols.append(gtPol)
             gtPolPoints.append(points)
+            gtTrans.append(transcription)
             if dontCare:
                 gtDontCarePolsNum.append(len(gtPols) - 1)
 
@@ -205,7 +244,7 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
 
             detFile = rrc_evaluation_funcs.decode_utf8(subm[resFile])
 
-            pointsList, confidencesList, _ = rrc_evaluation_funcs.get_tl_line_values_from_file_contents(detFile,evaluationParams['CRLF'],evaluationParams['LTRB'],True,evaluationParams['CONFIDENCES'])
+            pointsList, confidencesList, transcriptionsList = rrc_evaluation_funcs.get_tl_line_values_from_file_contents(detFile,evaluationParams['CRLF'],evaluationParams['LTRB'],evaluationParams['E2E'],evaluationParams['CONFIDENCES'])
             for n in range(len(pointsList)):
                 points = pointsList[n]
 
@@ -216,6 +255,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                     detPol = polygon_from_points(points)
                 detPols.append(detPol)
                 detPolPoints.append(points)
+                if evaluationParams['E2E']:
+                    transcription = transcriptionsList[n]
+                    detTrans.append(transcription)
                 if len(gtDontCarePolsNum) > 0:
                     for dontCarePol in gtDontCarePolsNum:
                         dontCarePol = gtPols[dontCarePol]
@@ -241,10 +283,20 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                         pD = detPols[detNum]
                         iouMat[gtNum, detNum] = get_intersection_over_union(pD, pG)
 
+                # match dt index of every gt
+                gtMatch = np.empty(len(gtPols), np.int8)
+                gtMatch.fill(-1)
+                # match gt index of every dt
+                dtMatch = np.empty(len(detPols), dtype=np.int8)
+                dtMatch.fill(-1)
+
                 for gtNum in range(len(gtPols)):
+                    max_iou = 0
+                    match_dt_idx = -1
+
                     for detNum in range(len(detPols)):
-                        if gtRectMat[gtNum] == 0 and detRectMat[
-                            detNum] == 0 and gtNum not in gtDontCarePolsNum and detNum not in detDontCarePolsNum:
+                        if gtRectMat[gtNum] == 0 and detRectMat[detNum] == 0\
+                                and gtNum not in gtDontCarePolsNum and detNum not in detDontCarePolsNum:
                             if iouMat[gtNum, detNum] > evaluationParams['IOU_CONSTRAINT']:
                                 gtRectMat[gtNum] = 1
                                 detRectMat[detNum] = 1
@@ -252,6 +304,39 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                                 pairs.append({'gt': gtNum, 'det': detNum})
                                 detMatchedNums.append(detNum)
                                 evaluationLog += "Match GT #" + str(gtNum) + " with Det #" + str(detNum) + "\n"
+
+                        if evaluationParams['E2E'] and gtMatch[gtNum] == -1 and dtMatch[detNum] == -1\
+                                and gtNum not in gtDontCarePolsNum and detNum not in detDontCarePolsNum:
+                            if iouMat[gtNum, detNum] > evaluationParams['IOU_CONSTRAINT'] and iouMat[gtNum, detNum] > max_iou:
+                                max_iou = iouMat[gtNum, detNum]
+                                match_dt_idx = detNum
+
+                    if evaluationParams['E2E'] and match_dt_idx >= 0:
+                        gtMatch[gtNum] = match_dt_idx
+                        dtMatch[match_dt_idx] = gtNum
+
+                if evaluationParams['E2E']:
+                    for gtNum in range(len(gtPols)):
+                        if gtNum in gtDontCarePolsNum:
+                            continue
+                        gt_text = gtTrans[gtNum]
+                        if gtMatch[gtNum] >= 0:
+                            dt_text = detTrans[gtMatch[gtNum]]
+                        else:
+                            dt_text = u''
+                        dist = text_distance(gt_text, dt_text)
+                        example_dist += dist
+                        match_tuples.append((gt_text, dt_text, dist))
+                    match_tuples.append(("===============","==============", -1))
+                    for detNum in range(len(detPols)):
+                        if detNum in detDontCarePolsNum:
+                            continue
+                        if dtMatch[detNum] == -1:
+                            gt_text = u''
+                            dt_text = detTrans[detNum]
+                            dist = text_distance(gt_text, dt_text)
+                            example_dist += dist
+                            match_tuples.append((gt_text, dt_text, dist))
 
             if evaluationParams['CONFIDENCES']:
                 for detNum in range(len(detPols)):
@@ -264,6 +349,27 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
 
                         arrGlobalConfidences.append(confidencesList[detNum])
                         arrGlobalMatches.append(match)
+        #avoid when det file don't exist, example_dist=0
+        elif evaluationParams['E2E']:
+            match_tuples.append(("===============", "==============", -1))
+            dt_text = u''
+            for gtNum in range(len(gtPols)):
+                if gtNum in gtDontCarePolsNum:
+                    continue
+                gt_text = gtTrans[gtNum]
+                dist = text_distance(gt_text, dt_text)
+                example_dist += dist
+                match_tuples.append((gt_text, dt_text, dist))
+        total_dist += example_dist
+
+        if evaluationParams['E2E']:
+            logger.debug('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            logger.debug("file:{}".format(resFile))
+            for tp in match_tuples:
+                gt_text, dt_text, dist = tp
+                logger.debug(u'GT: "{}" matched to DT: "{}", distance = {}'.format(gt_text, dt_text, dist))
+            logger.debug('Distance = {:f}'.format(example_dist))
+            logger.debug('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
 
         numGtCare = (len(gtPols) - len(gtDontCarePolsNum))
         numDetCare = (len(detPols) - len(detDontCarePolsNum))
@@ -298,6 +404,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                 'evaluationParams': evaluationParams,
                 'evaluationLog': evaluationLog
             }
+            if evaluationParams['E2E']:
+                perSampleMetrics[resFile]['exampleDistance'] = example_dist
+                # print("file:{} exampleDistance:{}".format(resFile,example_dist))
 
     # Compute MAP and MAR
     AP = 0
@@ -308,8 +417,9 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
     methodPrecision = 0 if numGlobalCareDet == 0 else float(matchedSum) / numGlobalCareDet
     methodHmean = 0 if methodRecall + methodPrecision == 0 else 2 * methodRecall * methodPrecision / (
     methodRecall + methodPrecision)
+    methodDistance = 0 if len(gt) == 0 else float(total_dist)/len(gt)
 
-    methodMetrics = {'precision': methodPrecision, 'recall': methodRecall, 'hmean': methodHmean, 'AP': AP}
+    methodMetrics = {'precision': methodPrecision, 'recall': methodRecall, 'hmean': methodHmean, 'AP': AP, 'distance': methodDistance}
 
     resDict = {'calculated': True, 'Message': '', 'method': methodMetrics, 'per_sample': perSampleMetrics}
 

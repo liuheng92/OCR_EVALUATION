@@ -8,6 +8,12 @@ import sys
 import os
 import codecs
 
+import logging
+
+logging.basicConfig()
+logger = logging.getLogger()
+logger.setLevel(logging.WARNING)
+
 def load_zip_file_keys(file,fileNameRegExp=''):
     """
     Returns an array with the entries of the ZIP file that match with the regular expression.
@@ -292,8 +298,8 @@ def main_evaluation(args,default_evaluation_params_fn,validate_data_fn,evaluate_
         validate_data_fn(args.g, args.s, evalParams)
         evalData = evaluate_method_fn(args.g, args.s, evalParams)
         resDict.update(evalData)
-        
-    except Exception, e:
+
+    except Exception,e:
         resDict['Message']= str(e)
         resDict['calculated']=False
 
