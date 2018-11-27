@@ -11,7 +11,7 @@ Download the ZIP file for the requested script and unzip it to a directory.
  
 Open a terminal in the directory and run the command:
 
-**python script.py –g gt.zip –s submit.zip**
+**python script.py –g gt.zip –s submit.zip -p '{\"LTRB\":true,\"E2E\":true}'**
  
 If you have already installed all the required modules, then you will see the method’s results or an error message if the submitted file is not correct.
  
