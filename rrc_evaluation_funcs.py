@@ -168,10 +168,10 @@ def get_tl_line_values(line, LTRB=True, withTranscription=False, withConfidence=
             if m == None:
                 raise Exception("Format incorrect. Should be: xmin,ymin,xmax,ymax")
 
-        xmin = int(m.group(1))
-        ymin = int(m.group(2))
-        xmax = int(m.group(3))
-        ymax = int(m.group(4))
+        xmin = float(m.group(1))
+        ymin = float(m.group(2))
+        xmax = float(m.group(3))
+        ymax = float(m.group(4))
         if (xmax < xmin):
             raise Exception("Xmax value (%s) not valid (Xmax < Xmin)." % (xmax))
         if (ymax < ymin):
