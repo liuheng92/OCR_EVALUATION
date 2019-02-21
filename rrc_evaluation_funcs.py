@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # encoding: UTF-8
 import json
-import sys;
+import sys
 
 sys.path.append('./')
 import zipfile
@@ -323,7 +323,7 @@ def main_evaluation(args, default_evaluation_params_fn, validate_data_fn, evalua
     """
     evalParams = default_evaluation_params_fn()
     if args.p:
-        evalParams.update(json.loads(args.p[1:-1]))
+        evalParams.update(json.loads(args.p))
 
     resDict = {'calculated': True, 'Message': '', 'method': '{}', 'per_sample': '{}'}
     try:
