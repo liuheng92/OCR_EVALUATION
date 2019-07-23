@@ -193,7 +193,7 @@ def evaluate_method(gtFilePath, submFilePath, evaluationParams):
                 points_y = points_tmp[:, 1]
                 xmin = points_x[np.argmin(points_x)]
                 xmax = points_x[np.argmax(points_x)]
-                ymin = points_y[np.argmin(points_x)]
+                ymin = points_y[np.argmin(points_y)]
                 ymax = points_y[np.argmax(points_y)]
                 points = [xmin, ymin, xmax, ymax]
             gtRect = Rectangle(*points)
